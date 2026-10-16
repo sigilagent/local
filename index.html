@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigil Observatory</title>
+<meta name="description" content="Opens the Sigil Observatory running on your own machine.">
+<meta name="referrer" content="origin">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%23a78bfa' stroke-width='1.6'%3E%3Cpolygon points='16,3 28,10 28,22 16,29 4,22 4,10' /%3E%3Cpath d='M16 3 L16 16 M28 10 L16 16 M28 22 L16 16 M16 29 L16 16 M4 22 L16 16 M4 10 L16 16'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%2322d3ee'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #08080d; --panel: #11111a; --line: #26263a;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #a78bfa; --code: #1a1a28;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f8fafc; --panel: #ffffff; --line: #e2e8f0;
+      --text: #0f172a; --muted: #475569; --accent: #7c3aed; --code: #f1f5f9;
+      color-scheme: light;
+    }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #ui { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  #help { position: fixed; inset: 0; display: none; place-items: center; padding: 16px;
+    background: var(--bg); overflow-y: auto; }
+  #help.show { display: grid; }
+  .card { max-width: 34rem; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 24px 28px; }
+  h1 { font-size: 1.1rem; margin: 0 0 4px; display: flex; gap: 10px; align-items: center; }
+  h1 svg { flex: none; }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  ol { margin: 0 0 18px; padding-left: 1.2rem; }
+  li { margin: 6px 0; }
+  code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code);
+    border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+  a { color: var(--accent); }
+  .status { color: var(--muted); font-size: 13px; margin: 0; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); margin-right: 6px; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+</head>
+<body>
+<!--
+  This page shows the Sigil Observatory that runs on YOUR machine, full-window,
+  so the address bar can read local.sigilagent.com instead of localhost:8199.
+  The frame points at http://localhost:<port>/ — nothing is sent anywhere else,
+  and this site never sees your agent's data. Sigil's Observatory renders only
+  at the top level or inside this page (see web/embed_interop.js in
+  sigilagent/sigil), and it tells this page when it has loaded.
+-->
+<div id="help" role="status" aria-live="polite">
+  <div class="card">
+    <h1>
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="#a78bfa" stroke-width="1.6"><polygon points="16,3 28,10 28,22 16,29 4,22 4,10"/><path d="M16 3 L16 16 M28 10 L16 16 M28 22 L16 16 M16 29 L16 16 M4 22 L16 16 M4 10 L16 16"/></g><circle cx="16" cy="16" r="2.6" fill="#22d3ee"/></svg>
+      Sigil isn't answering on this machine
+    </h1>
+    <p class="lede">This page opens the Observatory that runs on your own computer, on port <code id="port-a">8199</code>.</p>
+    <ol>
+      <li>Start it: <code>sigil serve start</code></li>
+      <li>Don't have Sigil yet? <a href="https://sigilagent.com">Install it</a>.</li>
+      <li>Running it on another port? Open <code id="port-hint">local.sigilagent.com/?port=N</code>.</li>
+      <li>If your browser blocks this page from reaching your computer, allow it when asked, or open <a id="direct" href="http://localhost:8199/">localhost:8199</a> directly.</li>
+    </ol>
+    <p class="status"><span class="dot"></span>Checking again every few seconds…</p>
+  </div>
+</div>
+<noscript>
+  <p style="padding:16px">This page needs JavaScript to open your local Sigil Observatory.
+  Open <a href="http://localhost:8199/">localhost:8199</a> directly instead.</p>
+</noscript>
+<script>
+(function () {
+  "use strict";
+  var help = document.getElementById("help");
+
+  // Never inside another site's frame: this page frames your local agent, so a
+  // page framing THIS one could dress it up and trick clicks.
+  if (window.top !== window.self) {
+    help.querySelector("h1").lastChild.textContent = " This page can't be embedded";
+    help.querySelector(".lede").textContent =
+      "Open local.sigilagent.com in its own tab to reach your Sigil Observatory.";
+    help.querySelector("ol").remove();
+    help.querySelector(".status").remove();
+    help.classList.add("show");
+    return;
+  }
+
+  var m = /^\d{2,5}$/.exec(new URLSearchParams(location.search).get("port") || "");
+  var port = m && +m[0] > 0 && +m[0] < 65536 ? m[0] : "8199";
+  var origins = ["http://localhost:" + port, "http://127.0.0.1:" + port];
+  var src = origins[0] + "/";
+
+  document.getElementById("port-a").textContent = port;
+  var direct = document.getElementById("direct");
+  direct.href = src;
+  direct.textContent = "localhost:" + port;
+
+  var frame = document.createElement("iframe");
+  frame.id = "ui";
+  frame.title = "Sigil Observatory";
+  // The referrer tells the Observatory who embeds it in browsers without
+  // ancestorOrigins (Firefox); "origin" sends just https://local.sigilagent.com.
+  frame.referrerPolicy = "origin";
+  // Chrome asks before a public site reaches localhost; delegate that to the frame.
+  frame.allow = "local-network-access";
+  frame.src = src;
+  document.body.insertBefore(frame, help);
+
+  var ready = false;
+  window.addEventListener("message", function (e) {
+    if (origins.indexOf(e.origin) === -1) return;
+    if (!e.data || e.data.sigil !== "observatory-ready") return;
+    ready = true;
+    help.classList.remove("show");
+  });
+
+  // No "ready" means the frame is showing the browser's error page (Sigil not
+  // running, or the browser blocked it). Explain, and keep retrying so the
+  // Observatory appears on its own once `sigil serve` is up.
+  setTimeout(function check() {
+    if (ready) return;
+    help.classList.add("show");
+    frame.src = src;
+    setTimeout(check, 4000);
+  }, 6000);
+})();
+</script>
+</body>
+</html>
